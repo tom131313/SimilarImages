@@ -4,7 +4,7 @@ Find jpg (or other types as desired with slight code modification) files that ar
 
 This program is largely a conglomeration of code snippits from the Internet put together to suit my purposes to find duplicate (similar) images in my collection.
 
-It uses H2 Java database and OPenCV Java.
+It uses H2 Java database and OpenCV Java.
 
 The algorithm is mostly from the help of "findimagedupes" (2.19) with other ideas from StackOverflow comments.
 
