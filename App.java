@@ -43,7 +43,8 @@ public class App {
 		DeleteDbFiles.execute("./", "signature", true); // DELETE DB
 
         Class.forName("org.h2.Driver");
-        conn = DriverManager.getConnection("jdbc:h2:./signature"); // also url, userid, password
+		conn = DriverManager.getConnection("jdbc:h2:./signature"); // also url, userid, password
+
 		statementInsert = conn.createStatement();
 		statementOuter = conn.createStatement();
 		
@@ -58,13 +59,16 @@ public class App {
 		//! create file for the System.out
 
 		Filewalker fw = x.new Filewalker(); //  SEARCH FOR JPG
-		fw.walk("E:\\Vicki pictures from laptop 4-20\\Pictures\\" ); // SEARCH FOR JPG
-		fw.walk("e:\\VickiPhotosFromBigComputer\\" ); // SEARCH FOR JPG
+		fw.walk("C:\\VDT\\" ); // SEARCH FOR JPG
+//		fw.walk("e:\\VickiPhotosFromBigComputer\\" ); // SEARCH FOR JPG
 //		fw.walk("C:\\Users\\RKT\\frc\\FRC2020\\Code\\Similar\\" ); // SEARCH FOR JPG
 		
 		statementInsert.close();
 
-		findSimilarImages();
+		System.err.println();
+		//System.err.println("Free memory after reading all files  " + Runtime.getRuntime().freeMemory());
+
+		x.findSimilarImages();
 
 		statementInner.close();
 		statementOuter.close();
@@ -73,16 +77,45 @@ public class App {
 		System.exit(0);
 	}
 
-	static void findSimilarImages() throws Exception {
+	void findSimilarImages() throws Exception {
 		ResultSet rsOuter = statementOuter.executeQuery("select * from signature");
 		statementInner = conn.prepareCall("SELECT * FROM signature WHERE id > ?");
-		boolean displayImages = true;
-
-		while (rsOuter.next()) { // outer loop over all lines
+		boolean displayImages = false;
+//mssim		Mat srcAmssim = null;
+		
+		while (rsOuter.next()) { // outer loop over all lines'
+			//System.err.println(rsOuter.getInt("id") + " " + Runtime.getRuntime().freeMemory());
 			statementInner.setInt(1, rsOuter.getInt("id")); // set the start of the next loop as the current position in this loop - diagonal half of a matrix
 			ResultSet rsInner = statementInner.executeQuery();
-	
+//mssim			srcAmssim = Imgcodecs.imread(rsOuter.getString("filename"), Imgcodecs.IMREAD_UNCHANGED);
+//mssim			if (srcAmssim.empty()) {
+//mssim				System.err.format("\n\n\nCannot read image: %s      \n\n\n", rsOuter.getString("filename"));
+//mssim				continue;
+//mssim			}
 			while (rsInner.next()) { // inner loop over the rest - diagonal half to find similarities
+
+				// Try the MSSIM
+				// Get the 2 images (again)
+				// Run the MSSIM
+				// Print the MSSIM if near 1
+				// This isn't efficient - shouldn't have to get the first image more than once for the mu and std but that isn't
+				// much compared to the covariance calcs
+				
+				// need to have 2 images at once
+				// tried to declare Mat srcBmssim outside the inner loop but imread has a huge memory leak so allocate and release each time
+//mssim				Mat srcBmssim = Imgcodecs.imread(rsInner.getString("filename"), Imgcodecs.IMREAD_UNCHANGED);
+//mssim				if (srcBmssim.empty()) {
+//mssim					System.err.format("\n\n\nCannot read image: %s      \n\n\n", rsInner.getString("filename"));
+//mssim				srcBmssim.release();
+//mssim				continue;
+//mssim				}
+	
+//mssim				double mssim = 0;
+//mssim				mssim = MSSIM.getMSSIM( srcAmssim, srcBmssim ).val[0]; // roughly > 0.4 similar;  < 0.4 disimilar;
+//mssim             // seems to have fewer false similars than the signature/hash but at huge cost
+//mssim				srcBmssim.release();
+				// System.err.println(mssim);
+
 				// compute similarity index
 				// to get number of 1's in the difference - lower count means more similar
 				int similarity;
@@ -92,31 +125,34 @@ public class App {
 					+ Long.bitCount(rsOuter.getLong("signature3") ^ rsInner.getLong("signature3"))) / 4)
 					+ Long.bitCount(rsOuter.getLong("signature4") ^ rsInner.getLong("signature4"));
 
-				if ( similarity <= maxDifferences)
-				{
+				if ( similarity <= maxDifferences) {
 					// Similar Images
-					if( displayImages )
-						{
-						Mat src = Imgcodecs.imread(rsOuter.getString("filename"));
-						HighGui.imshow("A " + similarity + " " + rsOuter.getString("filename"), src);
+					if( displayImages ) {
+						Mat srcA = Imgcodecs.imread(rsOuter.getString("filename"));
+						Mat srcB = Imgcodecs.imread(rsInner.getString("filename"));
+//mssim						HighGui.imshow("A " + similarity + " " + String.format("%4.2f", mssim) + " " + rsOuter.getString("filename"), srcA);
+						HighGui.imshow("A " + similarity + " " + rsOuter.getString("filename"), srcA);
 						int rc = HighGui.waitKey(0);
 						if ( rc == 27) displayImages = false; // esc stops display of images
 						else
 						{
-						src = Imgcodecs.imread(rsInner.getString("filename"));
-						HighGui.imshow("B " + similarity + " "  + rsInner.getString("filename"), src);
+						HighGui.imshow("B " + similarity + " "  + rsInner.getString("filename"), srcB);
 						rc = HighGui.waitKey(0);
 						if ( rc == 27) displayImages = false;
 						}
+						srcA.release();
+						srcB.release();
 						}
-						//System.out.println(similarity + ", " + rsOuter.getString("filename") + " || " + rsInner.getString("filename") );
-						System.out.format("%02d, %s || %s\n", similarity, rsOuter.getString("filename"), rsInner.getString("filename") );
+//mssim					System.out.format("%4.2f ", mssim);
+					//System.out.println(similarity + ", " + rsOuter.getString("filename") + " || " + rsInner.getString("filename") );
+					System.out.format("%02d, %s || %s\n", similarity, rsOuter.getString("filename"), rsInner.getString("filename") );
 					}
 				//System.out.println(rs.getInt("id") + ", " + rs.getLong("signature") + ", " + rs.getString("filename"));
 			}
 		rsInner.close();
 		}
 		rsOuter.close();
+//mssim		srcAmssim.release();
 	}
 
 	public class Filewalker {
@@ -182,7 +218,7 @@ public class App {
 		GripPipelineSimilar signatureImage=null;
 
 		try {
-		src = Imgcodecs.imread(filename);
+		src = Imgcodecs.imread(filename, Imgcodecs.IMREAD_UNCHANGED);
     	if (src.empty()) {
             System.err.format("\n\n\nCannot read image: %s      \n\n\n", filename);
             return;
