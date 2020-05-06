@@ -8,6 +8,8 @@ It uses H2 Java database and OpenCV Java.
 
 The algorithm is mostly from the help of "findimagedupes" (2.19) with other ideas from StackOverflow comments.
 
-Other comparison algorithms (SSIM, histogram and more) were tried but what's here is more than complicated enough to find my dupes.
+Other comparison algorithms (SSIM, histogram and more) were tried but what's here is more than complicated enough to find my dupes.etter
+
+The MSSIM is included here but execution is commented out.  The index is a little better than the hash code method but it is very expensive - a thousand times more cpu and elapsed time compared to the hash code.
 
 GRIP was used to generate most of the image processing pipeline Java code.
