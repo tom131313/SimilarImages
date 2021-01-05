@@ -1,6 +1,12 @@
 package app;
 
-// similarity between 2 images
+// Similarity between 2 images
+
+// Mean Structural Similarity (MSSIM)
+// The MSSIM method converted to Java from the C++ from:
+// https://docs.opencv.org/master/d5/dc4/tutorial_video_input_psnr_ssim.html
+// Video Input with OpenCV and similarity measurement
+
 // usage:     double mssim = MSSIM.getMSSIM( src1, src2 ).val[0];
 // mssim == 1.0 is src1 and src2 essentially identical;  mssim > 0.9 similar; mssim < 0.4 very different;  mssim == 0.0 completely different
 // good index seems to have fewer false similars than the signature/hash method but at a huge cost
