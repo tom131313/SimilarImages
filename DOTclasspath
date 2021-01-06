@@ -4,6 +4,7 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="lib" path="C:/opencv/build/java/opencv-450.jar"/>
 	<classpathentry kind="lib" path="C:/h2/bin/h2-1.4.199.jar"/>
+	<classpathentry kind="lib" path="res"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
 <!--also need in runtime path somehow C:\opencv\build\java\x64\opencv_java450.dll-->
