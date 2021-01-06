@@ -1,3 +1,5 @@
+// java -cp similar.jar app.APP "F:\\Pictures\\"
+// runs imageEdit file file2
 package app;
 
 import java.io.BufferedReader;
@@ -46,8 +48,9 @@ public class App {
   static int id = 0;
 
   //////////////////////////////////////////////////
-  // U S E R S E T T A B L E P A R A M E T E R S
+  // U S E R  S E T T A B L E   P A R A M E T E R S
 
+  static String imageDirectory; // start search directory (*.jpg fiels selected)
   static final boolean BW = true; // compares channel 0 - Y of YUV
   static final boolean COLOR = true; // compares channels 1 and 2 - UV of YUV
   static boolean displayImages = true; // display similar images
@@ -80,6 +83,9 @@ public class App {
   static PrintStream realErr = System.err; // the normal err output when not doing imread
 
   public static void main(String[] args) throws Exception {
+
+    imageDirectory = args.length>0 ? args[0] : "C:\\";
+
     fout = new FileOutputStream("similarImages.txt");
     similarFiles = new PrintStream(fout);
 
@@ -103,10 +109,7 @@ public class App {
         + "signature1 long,signature2 long,signature3 long,signature4 long," + "filename varchar)"); // CREATE DB
 
     Filewalker fw = x.new Filewalker(); // SEARCH FOR JPG
-    // fw.walk("data"); // SEARCH FOR JPG
-    fw.walk("F:\\Pictures\\"); // SEARCH FOR JPG
-    // fw.walk("C:\\VDT\\" ); // SEARCH FOR JPG
-    // fw.walk("e:\\VickiPhotosFromBigComputer\\" ); // SEARCH FOR JPG
+    fw.walk(imageDirectory); // SEARCH FOR JPG
 
     statementInsert.close();
 
@@ -258,8 +261,7 @@ public class App {
     }
   }
 
-  // compute similarity index (short signature as a highly blurred and compressed
-  // image)
+  // compute similarity index (short signature as a highly blurred and compressed image)
   class CompressImage {
 
     public void run(String filename) {
@@ -351,8 +353,12 @@ public class App {
           filename, e.toString());
         return;
       } finally {
-        src.release();
-        signatureImage.releaseMats(); // done with the Mats
+        if(src != null) {
+          src.release();
+        }
+        if(signatureImage != null) {
+          signatureImage.releaseMats(); // done with the Mats
+        }
       }
       // System.err.print(Runtime.getRuntime().freeMemory() + " ");
     }
@@ -364,7 +370,7 @@ public class App {
       // choice in the bat
       // imageEdit.bat "file1" "file2"
       List<String> command = new ArrayList<String>(); // build my command as a list of strings
-      command.add("imageEdit.bat");
+      command.add("imageEdit.cmd");
       command.add("\"" + image1 + "\"");
       command.add("\"" + image2 + "\"");
 
@@ -382,18 +388,15 @@ public class App {
 
   private static String displayImagesOutput(InputStream inputStream) throws IOException {
     StringBuilder sb = new StringBuilder();
-    BufferedReader br = null;
 
-    try {
-      br = new BufferedReader(new InputStreamReader(inputStream));
+    try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream))) {
+      
       String line = null;
       while ((line = br.readLine()) != null) {
         sb.append(line + System.getProperty("line.separator"));
       }
-    } finally {
-      br.close();
     }
-
+    
     return sb.toString();
   }
 
