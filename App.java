@@ -85,6 +85,7 @@ public class App {
   public static void main(String[] args) throws Exception {
 
     imageDirectory = args.length>0 ? args[0] : "C:\\";
+    System.out.println("Searching JPG files starting in " + imageDirectory);
 
     fout = new FileOutputStream("similarImages.txt");
     similarFiles = new PrintStream(fout);
@@ -128,7 +129,7 @@ public class App {
   void findSimilarImages() throws Exception {
 
     System.out.println(
-        "\nQ or q at any time stops display of subsequent similar images;\nlog file of all similar images is completed, however.\n\n");
+      "\nQ or q at any time stops display of subsequent similar images;\nlog file of all similar images is completed, however.\n\n");
     ResultSet rsOuter = statementOuter.executeQuery("select * from signature");
     statementInner = conn.prepareCall("SELECT * FROM signature WHERE id > ?");
 
@@ -141,21 +142,29 @@ public class App {
                                                       // loop - diagonal half of a matrix
       ResultSet rsInner = statementInner.executeQuery();
 
-      while (rsInner.next()) { // inner loop over the rest - diagonal half to find similarities
-        // Compute similarity index as the number differences in the bits of the
-        // compressed
-        // signature. That is the number of 1's in the XOR difference
+      while (rsInner.next()) { // inner loop over the rest - diagonal half - to find similarities
+
+        System.out.print("\r" + rsOuter.getInt("id") + ":" + rsInner.getInt("id"));
+        // Compute similarity index as (approximately) the number of different bits of the compressed
+        // signature. That is the number of 1's in the XOR difference.  Suggested current implementation is
+        // counts the similar bits in Y and a fourth the count of bits in U and V.
+        // signature4 is 0 and doesn't contribute.
         // Lower count means more similar
         int similarity;
         similarity = Long.bitCount(rsOuter.getLong("signature1") ^ rsInner.getLong("signature1"))
             + ((Long.bitCount(rsOuter.getLong("signature2") ^ rsInner.getLong("signature2"))
-                + Long.bitCount(rsOuter.getLong("signature3") ^ rsInner.getLong("signature3"))) / 4)
+            + Long.bitCount(rsOuter.getLong("signature3") ^ rsInner.getLong("signature3"))) / 4)
             + Long.bitCount(rsOuter.getLong("signature4") ^ rsInner.getLong("signature4"));
 
         if (similarity <= maxDifferences) {
-
+ 
           mssim = 0;
-          if (doMSSIM) {
+          File fileA = new File(rsOuter.getString("filename"));
+          File fileB = new File(rsInner.getString("filename"));
+          // a file might have been deleted already and not available for further processing
+          boolean filesExist = fileA.exists() && fileB.exists();
+
+          if (doMSSIM && filesExist) {
             // mssim technique seems to have fewer false similars than the signature/hash
             // but at huge cost for reading entire images n^2/2 times instead of the
             // short signature of images which usually can be stored in memory.
@@ -180,14 +189,12 @@ public class App {
           }
 
           if (!doMSSIM || mssim >= maxDifferencesMSSIM) { // use the initial mssim for printing below if not calculating it
+            
             // Similar Images
             similarFiles.format("%02d, %4.2f, %d:%d, %s || %s\n", similarity, mssim, rsOuter.getInt("id"),
                 rsInner.getInt("id"), rsOuter.getString("filename"), rsInner.getString("filename"));
 
-            if (displayImages) {
-              File fileA = new File(rsOuter.getString("filename"));
-              File fileB = new File(rsInner.getString("filename"));
-              if (fileA.exists() && fileB.exists()) { // might have been deleted already
+            if (displayImages && filesExist) {
                 Mat srcA = Imgcodecs.imread(rsOuter.getString("filename"));
                 Mat srcB = Imgcodecs.imread(rsInner.getString("filename"));
                 HighGui.imshow("A " + similarity + " " + String.format("%4.2f ", mssim) + rsOuter.getString("filename"),
@@ -209,7 +216,6 @@ public class App {
                 srcA.release();
                 srcB.release();
                 displayImages(rsOuter.getString("filename"), rsInner.getString("filename"));
-              }
             }
           }
         }
