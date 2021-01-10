@@ -1,5 +1,5 @@
-// Example:java -cp Similar.jar app.App "path"
-// Example:java -jar Similar.jar "path"
+// Example:java -cp Similar.jar app.App "path" (if libraries not necessarily included in the jar)
+// Example:java -jar Similar.jar "path" (if all libraries included in the jar)
 // no refined mssim comparison; start JPG file search at C:\\
 // display similar pairs of images as they are found
 // no signature vectors output
@@ -103,7 +103,7 @@ public class App {
 
   public static void main(String[] args) throws Exception {
 
-    if(args.length>0) {
+    if(args.length > 0) {
       imageDirectory =  args[0];
       System.out.println("Searching JPG files starting in " + imageDirectory);
     }
@@ -114,7 +114,8 @@ public class App {
         + "-DsignatureOut optional suppress vector file output\n"
         + "-DnoDisplay optional suppress display of similar image pairs\n"
         + "-Dmssim=<dpuble value> specify refined similarity check [0.0 dissimilar to 1.0 essentially identical]\n"
-        + "basic example:java -cp Similar.jar app.App \"C:\\Users\\Public\\Pictures\"\n"
+        + "basic fast check example:java -cp Similar.jar app.App \"C:\\Users\\Public\\Pictures\"\n"
+        + "eliminate any gross dissimilar example:java -cp Similar.jar -Dmssim=.25 app.App \"C:\\Users\\Public\\Pictures\"\n"
         );
       return;
     }
@@ -168,8 +169,10 @@ public class App {
     statementInsert = conn.createStatement();
     statementOuter = conn.createStatement();
 
-    statementOuter.execute("create table Signature(id int primary key,"
-        + "signature1 long,signature2 long,signature3 long,signature4 long," + "filename varchar)"); // CREATE DB
+    statementOuter.execute(
+        "create table Signature(id int primary key,"
+              + "signature1 long,signature2 long,signature3 long,"
+              + "filename varchar)"); // CREATE DB
 
     Filewalker fw = x.new Filewalker(); // SEARCH FOR JPG
     fw.walk(imageDirectory); // SEARCH FOR JPG
@@ -208,13 +211,11 @@ public class App {
         // Compute similarity index as (approximately) the number of different bits of the compressed
         // signature. That is the number of 1's in the XOR difference.  Suggested current implementation is
         // counts the similar bits in Y and a fourth the count of bits in U and V.
-        // signature4 is 0 and doesn't contribute.
         // Lower count means more similar
         int similarity;
         similarity = Long.bitCount(rsOuter.getLong("signature1") ^ rsInner.getLong("signature1"))
             + ((Long.bitCount(rsOuter.getLong("signature2") ^ rsInner.getLong("signature2"))
-            + Long.bitCount(rsOuter.getLong("signature3") ^ rsInner.getLong("signature3"))) / 4)
-            + Long.bitCount(rsOuter.getLong("signature4") ^ rsInner.getLong("signature4"));
+            + Long.bitCount(rsOuter.getLong("signature3") ^ rsInner.getLong("signature3"))) / 4);
 
         if (similarity <= maxDifferences) {
  
@@ -364,7 +365,7 @@ public class App {
         // [Compute Hash]
         signatureImage = new GripPipelineSimilar();
 
-        long[] hash = { 0, 0, 0, 0 };
+        long[] hash = { 0, 0, 0 };
 
         boolean firstTimeWriteKohID = true;
         int startChannel = (BW ? 0 : COLOR ? 1 : 99); // if neither BW or COLOR don't do anything
@@ -386,8 +387,7 @@ public class App {
 
           signatureImage.cvAdaptivethresholdOutput().get(0, 0, temp); //
 
-          // compress the 64 bits from each channel into 3 longs - hash[0] to hash[3] 3 is
-          // still 0
+          // compress the 64 bits from each channel into 3 longs - hash[0] to hash[2]
           long mask = 1;
 
           for (int idx = 0; idx < Math.min(64, temp.length); idx++) {
@@ -410,7 +410,7 @@ public class App {
         } // end loop processing the 3 image channels Y U V
 
         statementInsert.execute("insert into Signature values(" + id + ", " + hash[0] + "," + hash[1]
-          + "," + hash[2] + "," + hash[3] + "," + "'" + filename.replace("'", "''") + "')");
+          + "," + hash[2] + "," + "'" + filename.replace("'", "''") + "')");
 
         // ! [Compute Hash]
 
