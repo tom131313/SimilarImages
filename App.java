@@ -1,5 +1,24 @@
-// java -cp similar.jar app.APP "F:\\Pictures\\"
-// runs imageEdit file file2
+// Example:java -cp Similar.jar app.App "path"
+// Example:java -jar Similar.jar "path"
+// no refined mssim comparison; start JPG file search at C:\\
+// display similar pairs of images as they are found
+// no signature vectors output
+
+// Example:java -cp Similar.jar -Dmssim=0.25 app.APP "F:\\Pictures\\"
+// refine comparison restrict to MSSIM computation <= 0.25 (vaguely similar);
+// start JPG file search at f:\\Pictures\\
+// no signature vectors output
+
+// Example:java -cp Similar.jar -DnoDisplay app.App -DsignatureOut "C:\\Users\\RKT\\Pictures"
+// do not display images; do not use MSSIM similarity computation
+// start JPG file search at C:\\Users\\RKT\\Pictures
+// create signature vectors file
+
+// mssim is optional and should be a double from 0 (dissimilar) to 1 (essentially identical)
+// default is don't use mssim
+
+// After displaying similar image pairs, command file "imageEdit.cmd file1 file2" is run
+
 package app;
 
 import java.io.BufferedReader;
@@ -32,7 +51,7 @@ public class App {
   } // Load the native OpenCV library
 
   // [Kohonen vector output for post processing]
-  static final boolean kohRun = true; // user specified switch to put out signature vectors or not for Kohonen
+  static boolean kohRun; // user specified switch to put out signature vectors or not for Kohonen e.g.
   // following definitions only for Kohonen
   static FileOutputStream koh; // similarity vector for Kohonen process
   static PrintStream kohVectors;
@@ -53,12 +72,12 @@ public class App {
   static String imageDirectory; // start search directory (*.jpg fiels selected)
   static final boolean BW = true; // compares channel 0 - Y of YUV
   static final boolean COLOR = true; // compares channels 1 and 2 - UV of YUV
-  static boolean displayImages = true; // display similar images
+  static boolean displayImages; // display similar images
   // max number of "dimensions" different to consider similar
   // suggest if BW && COLOR maxDifferences = 12 else maxDifferences = 9
   static final int maxDifferences = 12;
 
-  static final boolean doMSSIM = true;
+  static boolean doMSSIM;
   // additional refinement for differences uses computer hog MSSIM
   // only used for possible matches from the signature comparison (maxDifferences)
   // which occasionally matches 2 very different images
@@ -66,7 +85,7 @@ public class App {
   // .8 to .4 is similar
   // .4 to .2 is not much similarity maybe the same scene
   // below .2 is different
-  static final double maxDifferencesMSSIM = .25;
+  static double maxDifferencesMSSIM;
 
   //////////////////////////////////////////////////
   //////////////////////////////////////////////////
@@ -84,8 +103,51 @@ public class App {
 
   public static void main(String[] args) throws Exception {
 
-    imageDirectory = args.length>0 ? args[0] : "C:\\";
-    System.out.println("Searching JPG files starting in " + imageDirectory);
+    if(args.length>0) {
+      imageDirectory =  args[0];
+      System.out.println("Searching JPG files starting in " + imageDirectory);
+    }
+    else {
+      System.out.println(
+        "java -cp Similar.jar -DsignatureOut -DnoDisplay -Dmssim=<double value> app.App \"search path\"\n"
+         + "java -DsignatureOut -DnoDisplay -Dmssim=<double value> -jar Similar.jar \"search path\"\n"
+        + "-DsignatureOut optional suppress vector file output\n"
+        + "-DnoDisplay optional suppress display of similar image pairs\n"
+        + "-Dmssim=<dpuble value> specify refined similarity check [0.0 dissimilar to 1.0 essentially identical]\n"
+        + "basic example:java -cp Similar.jar app.App \"C:\\Users\\Public\\Pictures\"\n"
+        );
+      return;
+    }
+
+    if(System.getProperty("mssim") != null) {
+      doMSSIM = true;
+      maxDifferencesMSSIM = Double.parseDouble(System.getProperty("mssim"));
+      System.out.println("MSSIM set [-Dmssim=[0. to 1.]] limit =" + maxDifferencesMSSIM);
+    }
+    else {
+      doMSSIM = false;
+      System.out.println("No additional MSSIM computation");
+    }
+
+    if(System.getProperty("noDisplay") != null) {
+      displayImages = false;
+      System.out.println("Images not displayed [-DnoDisplay]");
+    }
+    else {
+      displayImages = true;
+      System.out.println("Similar image pairs displayed,imageEdit.cmd run, and process paused\n"
+      + "Press any key to continue\n"
+      + "Q or q stops display of subsequent similar images;\nlog file of all similar images is completed, however.\n");
+    }
+
+    if(System.getProperty("signatureOut") != null) {
+      kohRun = true;
+      System.out.println("Create signature vector file");
+    }
+    else {
+      kohRun = false;
+      System.out.println("Signature vector file not created");
+    }
 
     fout = new FileOutputStream("similarImages.txt");
     similarFiles = new PrintStream(fout);
@@ -128,8 +190,6 @@ public class App {
 
   void findSimilarImages() throws Exception {
 
-    System.out.println(
-      "\nQ or q at any time stops display of subsequent similar images;\nlog file of all similar images is completed, however.\n\n");
     ResultSet rsOuter = statementOuter.executeQuery("select * from signature");
     statementInner = conn.prepareCall("SELECT * FROM signature WHERE id > ?");
 
