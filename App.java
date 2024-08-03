@@ -5,7 +5,7 @@
 // no signature vectors output
 
 // Example:java -cp Similar.jar -Dmssim=0.25 app.APP "F:\\Pictures\\"
-// refine comparison restrict to MSSIM computation <= 0.25 (vaguely similar);
+// refine comparison restrict to MSSIM computation <= 0.25 (vaguely similar) (.75 is quite similar)
 // start JPG file search at f:\\Pictures\\
 // no signature vectors output
 
@@ -18,8 +18,46 @@
 // default is don't use mssim
 
 // After displaying similar image pairs, command file "imageEdit.cmd file1 file2" is run
+// Image A is presented with the similarity indices. Press Enter and Image B is presented and again
+// the similarity indices. Press enter and the imageEdit.cmd is run typically to show the two files
+// in IrfanView or other editor so the files can be renamed, deleted, or do nothing but close the editor.
+
+// Processes only case insensitive "*.jpg". Could add others such as "jpeg", "png", etc.
+// To list all the files and folders that are not "jpg", use Agent Ransack search case insensitive "NOT:*.jpg"
+
+// Running a duplicate file finder such as "CCleaner" is more efficient and has options to match files by
+// name, date, size, or contents and easily delete excess files (but without viewing them first).
+
+// This similarity program does not do a byte by byte file comparison and cannot know if the files are
+// truly identical. For exact compares use something like "CCleaner" or DOS/command line prompt program "comp".
+
+/*
+Example file to run: FindDuplicateImages.bat
+
+echo on
+rem  -DsignatureOut is for Kohonen
+cd C:\Users\RKT\frc\FRC2020\Code\Similar
+rem set OPENCV_LOG_LEVEL=DEBUG
+rem java -DmaxDifferences=20 -DnoDisplay -DsignatureOut -jar Similar.jar "C:\\Users\\RKT\\Pictures\\Sony_DSC_Complete_Editing"
+rem java -Dmssim=0.75 -jar Similar.jar "F:\\Images\\Vicki"
+java -DnoDisplay -jar Similar.jar "F:\\Images"
+rem java -DnoDisplay -DsignatureOut -jar Similar.jar "C:\\Users\\RKT\\Pictures\\Sony_DSC_Complete_Editing"
+rem java -DmaxDifferences=20 -DnoDisplay -jar Similar.jar "C:\\Users\\RKT\\frc\\FRC2020\\Code\\Similar\\data"
+pause
+rem OPENCV_LOG_LEVEL=e or 2 
+rem  * Define CV_LOG_STRIP_LEVEL=CV_LOG_LEVEL_[DEBUG|INFO|WARN|ERROR|FATAL|DISABLED]
+rem to compile out anything at that and before that logging level
+
+*/
 
 package app;
+
+import org.h2.tools.DeleteDbFiles;
+
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.highgui.HighGui;
+import org.opencv.imgcodecs.Imgcodecs;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -38,17 +76,12 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.opencv.core.Core;
-import org.opencv.core.Mat;
-import org.opencv.highgui.HighGui;
-import org.opencv.imgcodecs.Imgcodecs;
-
-import org.h2.tools.DeleteDbFiles;
-
 public class App {
+
   static {
-    System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-  } // Load the native OpenCV library
+    System.loadLibrary(Core.NATIVE_LIBRARY_NAME); // Load the native OpenCV library
+    // System.out.println("OpenCV version " + Core.getVersionString() + "\n" + Core.getBuildInformation());
+  }
 
   // [Kohonen vector output for post processing]
   static boolean kohRun; // user specified switch to put out signature vectors or not for Kohonen e.g.
@@ -69,13 +102,15 @@ public class App {
   //////////////////////////////////////////////////
   // U S E R  S E T T A B L E   P A R A M E T E R S
 
-  static String imageDirectory; // start search directory (*.jpg fiels selected)
+  static String imageDirectory; // start search directory (*.jpg files selected)
+  // B&W images forced BW = true; color images have the choice B&W, color, or both
+  // at least one must be true - no validation
   static final boolean BW = true; // compares channel 0 - Y of YUV
   static final boolean COLOR = true; // compares channels 1 and 2 - UV of YUV
   static boolean displayImages; // display similar images
   // max number of "dimensions" different to consider similar
   // suggest if BW && COLOR maxDifferences = 12 else maxDifferences = 9
-  static final int maxDifferences = 12;
+  static int maxDifferences = 12;
 
   static boolean doMSSIM;
   // additional refinement for differences uses computer hog MSSIM
@@ -100,7 +135,7 @@ public class App {
   static ByteArrayOutputStream baos = new ByteArrayOutputStream();
   static PrintStream ps = new PrintStream(baos);
   static PrintStream realErr = System.err; // the normal err output when not doing imread
-
+  
   public static void main(String[] args) throws Exception {
 
     if(args.length > 0) {
@@ -111,14 +146,26 @@ public class App {
       System.out.println(
         "java -cp Similar.jar -DsignatureOut -DnoDisplay -Dmssim=<double value> app.App \"search path\"\n"
          + "java -DsignatureOut -DnoDisplay -Dmssim=<double value> -jar Similar.jar \"search path\"\n"
-        + "-DsignatureOut optional suppress vector file output\n"
+        + "-DsignatureOut optional create vector file output\n"
         + "-DnoDisplay optional suppress display of similar image pairs\n"
-        + "-Dmssim=<dpuble value> specify refined similarity check [0.0 dissimilar to 1.0 essentially identical]\n"
-        + "basic fast check example:java -cp Similar.jar app.App \"C:\\Users\\Public\\Pictures\"\n"
+        + "-DmaxDifferences optional number of differences to be considered similar\n"
+        + "         [default 12, very similar; 20 is somewhat similar; 0 is essentially identical]\n"
+        + "-Dmssim=<dpuble value> optional refined similarity check [0.0 dissimilar to 1.0 essentially identical]\n"
+        + "basic fast check example:java -cp  Similar.jar app.App \"C:\\Users\\Public\\Pictures\"\n"
+        + "basic fast check example:java -jar Similar.jar         \"C:\\Users\\Public\\Pictures\"\n"
         + "eliminate any gross dissimilar example:java -cp Similar.jar -Dmssim=.25 app.App \"C:\\Users\\Public\\Pictures\"\n"
         );
       return;
     }
+
+    if(System.getProperty("maxDifferences") != null) {
+      maxDifferences = Integer.parseInt(System.getProperty("maxDifferences"));
+    }
+    else {
+      maxDifferences = 12;
+      System.out.println("max differences not specified; using default");
+    }
+    System.out.println("max differences to be considered similar = " + maxDifferences);
 
     if(System.getProperty("mssim") != null) {
       doMSSIM = true;
@@ -127,7 +174,7 @@ public class App {
     }
     else {
       doMSSIM = false;
-      System.out.println("No additional MSSIM computation");
+      System.out.println("No additional MSSIM computation [-Dmssim=<double value> not specified]");
     }
 
     if(System.getProperty("noDisplay") != null) {
@@ -136,18 +183,19 @@ public class App {
     }
     else {
       displayImages = true;
-      System.out.println("Similar image pairs displayed,imageEdit.cmd run, and process paused\n"
+      System.out.println("Similar image pairs displayed [-DnoDisplay not specified],\n"
+      + "imageEdit.cmd run, and process paused\n"
       + "Press any key to continue\n"
       + "Q or q stops display of subsequent similar images;\nlog file of all similar images is completed, however.\n");
     }
 
     if(System.getProperty("signatureOut") != null) {
       kohRun = true;
-      System.out.println("Create signature vector file");
+      System.out.println("Create signature vector file [-DsignatureOut]");
     }
     else {
       kohRun = false;
-      System.out.println("Signature vector file not created");
+      System.out.println("Signature vector file not created [-DsignatureOut not specified]");
     }
 
     fout = new FileOutputStream("similarImages.txt");
@@ -175,7 +223,7 @@ public class App {
               + "filename varchar)"); // CREATE DB
 
     Filewalker fw = x.new Filewalker(); // SEARCH FOR JPG
-    fw.walk(imageDirectory); // SEARCH FOR JPG
+    fw.walk(imageDirectory); // SEARCH FOR JPG and compress them
 
     statementInsert.close();
 
@@ -191,103 +239,12 @@ public class App {
     System.exit(0);
   }
 
-  void findSimilarImages() throws Exception {
-
-    ResultSet rsOuter = statementOuter.executeQuery("select * from signature");
-    statementInner = conn.prepareCall("SELECT * FROM signature WHERE id > ?");
-
-    double mssim;
-
-    while (rsOuter.next()) { // outer loop over all lines'
-      // System.err.println(rsOuter.getInt("id") + " " +
-      // Runtime.getRuntime().freeMemory());
-      statementInner.setInt(1, rsOuter.getInt("id")); // set the start of the next loop as the current position in this
-                                                      // loop - diagonal half of a matrix
-      ResultSet rsInner = statementInner.executeQuery();
-
-      while (rsInner.next()) { // inner loop over the rest - diagonal half - to find similarities
-
-        System.out.print("\r" + rsOuter.getInt("id") + ":" + rsInner.getInt("id"));
-        // Compute similarity index as (approximately) the number of different bits of the compressed
-        // signature. That is the number of 1's in the XOR difference.  Suggested current implementation is
-        // counts the similar bits in Y and a fourth the count of bits in U and V.
-        // Lower count means more similar
-        int similarity;
-        similarity = Long.bitCount(rsOuter.getLong("signature1") ^ rsInner.getLong("signature1"))
-            + ((Long.bitCount(rsOuter.getLong("signature2") ^ rsInner.getLong("signature2"))
-            + Long.bitCount(rsOuter.getLong("signature3") ^ rsInner.getLong("signature3"))) / 4);
-
-        if (similarity <= maxDifferences) {
- 
-          mssim = 0;
-          File fileA = new File(rsOuter.getString("filename"));
-          File fileB = new File(rsInner.getString("filename"));
-          // a file might have been deleted already and not available for further processing
-          boolean filesExist = fileA.exists() && fileB.exists();
-
-          if (doMSSIM && filesExist) {
-            // mssim technique seems to have fewer false similars than the signature/hash
-            // but at huge cost for reading entire images n^2/2 times instead of the
-            // short signature of images which usually can be stored in memory.
-            // too much reading of images from a mechanical disk drive will destroy
-            // the drive (I know).
-
-            // Get the 2 images (again)
-            // Run the MSSIM
-            // Print the MSSIM if near 1
-            // This isn't efficient - shouldn't have to get the first image more than once
-            // for the mu and std but that isn't
-            // much compared to the covariance calcs
-
-            // need to have 2 images at once
-            // tried to declare Mat srcBmssim outside the inner loop but imread has a huge
-            // memory leak so allocate and release each time
-            Mat srcAmssim = Imgcodecs.imread(rsOuter.getString("filename"), Imgcodecs.IMREAD_UNCHANGED);
-            Mat srcBmssim = Imgcodecs.imread(rsInner.getString("filename"), Imgcodecs.IMREAD_UNCHANGED);
-            mssim = MSSIM.getMSSIM(srcAmssim, srcBmssim).val[0]; // roughly > 0.4 similar; < 0.4 disimilar;
-            srcAmssim.release();
-            srcBmssim.release();
-          }
-
-          if (!doMSSIM || mssim >= maxDifferencesMSSIM) { // use the initial mssim for printing below if not calculating it
-            
-            // Similar Images
-            similarFiles.format("%02d, %4.2f, %d:%d, %s || %s\n", similarity, mssim, rsOuter.getInt("id"),
-                rsInner.getInt("id"), rsOuter.getString("filename"), rsInner.getString("filename"));
-
-            if (displayImages && filesExist) {
-                Mat srcA = Imgcodecs.imread(rsOuter.getString("filename"));
-                Mat srcB = Imgcodecs.imread(rsInner.getString("filename"));
-                HighGui.imshow("A " + similarity + " " + String.format("%4.2f ", mssim) + rsOuter.getString("filename"),
-                    srcA);
-                // HighGui.imshow("A " + similarity + " " + rsOuter.getString("filename"),
-                // srcA);
-                int rc = HighGui.waitKey(0);
-                if (rc == 81 || rc == 113)
-                  displayImages = false; // Q or q stops display of images (27 == esc)
-                else {
-                  HighGui.imshow(
-                      "B " + similarity + " " + String.format("%4.2f ", mssim) + rsInner.getString("filename"), srcB);
-                  // HighGui.imshow("B " + similarity + " " + rsInner.getString("filename"),
-                  // srcB);
-                  rc = HighGui.waitKey(0);
-                  if (rc == 81 || rc == 113)
-                    displayImages = false;
-                }
-                srcA.release();
-                srcB.release();
-                displayImages(rsOuter.getString("filename"), rsInner.getString("filename"));
-            }
-          }
-        }
-      }
-      rsInner.close();
-    }
-    rsOuter.close();
-  }
-
   public class Filewalker {
 
+    /**
+     * Called recursively for subdirectories
+     * @param path
+     */
     public void walk(String path) {
 
       File root = new File(path);
@@ -301,8 +258,8 @@ public class App {
           // file.getAbsolutePath());
 
           return file.isDirectory()// process all directories and files ending with ".jpg"
-              || (file.canRead() && file.getName().length() >= 3
-                  && file.getName().substring(file.getName().length() - 3).equalsIgnoreCase("JPG"));
+              || (file.canRead() && file.getName().length() >= 4
+                  && file.getName().substring(file.getName().length() - 4).equalsIgnoreCase(".JPG"));
           // || (file.canRead()) && (file.getName().endsWith(".jpg") ||
           // file.getName().endsWith(".JPG"));
         }
@@ -325,6 +282,8 @@ public class App {
           new CompressImage().run(file.getAbsoluteFile().toString());
         }
       }
+      // the end of the file list for this directory
+      // recursive invocations unwind here at the end
     }
   }
 
@@ -365,11 +324,16 @@ public class App {
         // [Compute Hash]
         signatureImage = new GripPipelineSimilar();
 
-        long[] hash = { 0, 0, 0 };
+        long[] hash = { 0, 0, 0 }; // space for 3 channels; might not use them all
 
         boolean firstTimeWriteKohID = true;
-        int startChannel = (BW ? 0 : COLOR ? 1 : 99); // if neither BW or COLOR don't do anything
-        int endChannel = (COLOR ? 2 : BW ? 0 : -99);
+
+        int startChannel;
+        int endChannel;
+
+        // all are or will be color images so there is a choice; process as color or B&W or both?
+        startChannel = (BW ? 0 : 1);
+        endChannel = (COLOR ? 2 : 0);
 
         for (int channel = startChannel; channel <= endChannel; channel++) {
 
@@ -434,7 +398,7 @@ public class App {
     try {
       // execute command to display pair of similar images in external editor of
       // choice in the bat
-      // imageEdit.bat "file1" "file2"
+      // imageEdit.cmd "file1" "file2"
       List<String> command = new ArrayList<String>(); // build my command as a list of strings
       command.add("imageEdit.cmd");
       command.add("\"" + image1 + "\"");
@@ -466,6 +430,105 @@ public class App {
     return sb.toString();
   }
 
+  void findSimilarImages() throws Exception {
+
+    ResultSet rsOuter = statementOuter.executeQuery("select * from signature");
+    statementInner = conn.prepareCall("SELECT * FROM signature WHERE id > ?");
+
+    double mssim;
+
+    while (rsOuter.next()) { // outer loop over all lines
+      // System.err.println(rsOuter.getInt("id") + " " +
+      // Runtime.getRuntime().freeMemory());
+      System.out.print("\r" + rsOuter.getInt("id"));
+      statementInner.setInt(1, rsOuter.getInt("id")); // set the start of the next loop as the current position in this
+                                                      // loop - diagonal half of a matrix
+      ResultSet rsInner = statementInner.executeQuery();
+
+      while (rsInner.next()) { // inner loop over the rest - diagonal half - to find similarities
+
+        // System.out.print("\r" + rsOuter.getInt("id") + ":" + rsInner.getInt("id"));
+        // Compute similarity index as (approximately) the number of different bits of the compressed
+        // signature. That is the number of 1's in the XOR difference.  Suggested current implementation is
+        // counts the similar bits in Y and a fourth the count of bits in U and V.
+        // Lower count means more similar
+        int similarity;
+        similarity = Long.bitCount(rsOuter.getLong("signature1") ^ rsInner.getLong("signature1"))
+            + ((Long.bitCount(rsOuter.getLong("signature2") ^ rsInner.getLong("signature2"))
+            + Long.bitCount(rsOuter.getLong("signature3") ^ rsInner.getLong("signature3"))) / 4);
+
+        if (similarity <= maxDifferences) {
+ 
+          mssim = 0;
+          File fileA = new File(rsOuter.getString("filename"));
+          File fileB = new File(rsInner.getString("filename"));
+          // a file might have been deleted already and not available for further processing
+          boolean filesExist = fileA.exists() && fileB.exists();
+
+          if (doMSSIM && filesExist) {
+            // mssim technique seems to have fewer false similars than the signature/hash
+            // but at huge cost for reading entire images n^2/2 times instead of the
+            // short signature of images which usually can be stored in memory.
+            // too much reading of images from a mechanical disk drive will destroy
+            // the drive (I know).
+
+            // Get the 2 images (again)
+            // Run the MSSIM
+            // Print the MSSIM if near 1
+            // This isn't efficient - shouldn't have to get the first image more than once
+            // for the mu and std but that isn't
+            // much compared to the covariance calcs
+
+            // need to have 2 images at once
+            // tried to declare Mat srcBmssim outside the inner loop but imread has a huge
+            // memory leak so allocate and release each time
+            Mat srcAmssim = Imgcodecs.imread(rsOuter.getString("filename"), Imgcodecs.IMREAD_UNCHANGED);
+            Mat srcBmssim = Imgcodecs.imread(rsInner.getString("filename"), Imgcodecs.IMREAD_UNCHANGED);
+            // getMSSIM() returns 3 values in a Scalar (val[0], val[1], val[2]).  Ostensibly it was OpenCV
+            // BGR planes but MSSIM doesn't know the meaning of planes.
+            // For this program the image had been converted to YUV from BGR and only the Y is checked
+            // below for MSSIM. 
+            mssim = MSSIM.getMSSIM(srcAmssim, srcBmssim).val[0]; // roughly > 0.4 similar; < 0.4 dissimilar;
+            srcAmssim.release();
+            srcBmssim.release();
+          }
+
+          if (!doMSSIM || mssim >= maxDifferencesMSSIM) { // use the initial mssim for printing below if not calculating it
+            
+            // Similar Images
+            similarFiles.format("%02d, %4.2f, %d:%d, %s || %s\n", similarity, mssim, rsOuter.getInt("id"),
+                rsInner.getInt("id"), rsOuter.getString("filename"), rsInner.getString("filename"));
+
+            if (displayImages && filesExist) {
+                Mat srcA = Imgcodecs.imread(rsOuter.getString("filename"));
+                Mat srcB = Imgcodecs.imread(rsInner.getString("filename"));
+                HighGui.imshow("A " + similarity + " " + String.format("%4.2f ", mssim) + rsOuter.getString("filename"),
+                    srcA);
+                // HighGui.imshow("A " + similarity + " " + rsOuter.getString("filename"),
+                // srcA);
+                int rc = HighGui.waitKey(0);
+                if (rc == 81 || rc == 113)
+                  displayImages = false; // Q or q stops display of images (27 == esc)
+                else {
+                  HighGui.imshow(
+                      "B " + similarity + " " + String.format("%4.2f ", mssim) + rsInner.getString("filename"), srcB);
+                  // HighGui.imshow("B " + similarity + " " + rsInner.getString("filename"),
+                  // srcB);
+                  rc = HighGui.waitKey(0);
+                  if (rc == 81 || rc == 113)
+                    displayImages = false;
+                }
+                srcA.release();
+                srcB.release();
+                displayImages(rsOuter.getString("filename"), rsInner.getString("filename"));
+            }
+          }
+        }
+      }
+      rsInner.close();
+    }
+    rsOuter.close();
+  }
 }
 /*
 Calculating the sum of the squares of the differences of the pixel colour values of a drastically scaled-down version (eg: 6x6 pixels) works nicely. Identical images yield 0, similar images yield small numbers, different images yield big ones.

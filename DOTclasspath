@@ -2,9 +2,9 @@
 <classpath>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-11"/>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="lib" path="C:/opencv/build/java/opencv-450.jar"/>
-	<classpathentry kind="lib" path="C:/h2/bin/h2-1.4.199.jar"/>
+	<classpathentry kind="lib" path="C:/opencv/build/java/opencv-480.jar"/>
+	<classpathentry kind="lib" path="C:/Program Files (x86)/H2/bin/h2-2.1.214.jar"/>
 	<classpathentry kind="lib" path="res"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
-<!--also need in runtime path somehow C:\opencv\build\java\x64\opencv_java450.dll-->
+<!--also need in runtime path somehow C:\opencv\build\java\x64\opencv_java480.dll-->

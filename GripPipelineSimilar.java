@@ -15,7 +15,6 @@ import org.opencv.imgproc.*;
 * @author GRIP
 */
 public class GripPipelineSimilar {
-
 	//Outputs
 	private Mat convertOutput = new Mat();
 	private Mat cvResize0Output = new Mat();
@@ -34,12 +33,15 @@ public class GripPipelineSimilar {
 	 * This is the primary method that runs the entire pipeline and updates the outputs.
 	 */
 	public void process(Mat source0, int channelSelected) {
+		// Step Convert B&W to color so all are like color
+		if (source0.channels() <= 2) {        
+			convert(source0, source0, Imgproc.COLOR_GRAY2BGR);
+		}
 		// Step Convert0:
 		Mat convertSrc = source0;
 		int convertType = Imgproc.COLOR_BGR2YUV;
 		//System.err.println("convert " + convertSrc);
 		convert(convertSrc, convertOutput, convertType);
-
 		// Step CV_resize0:
 		Mat cvResize0Src = convertOutput;
 		Size cvResize0Dsize = new Size(160, 160);
@@ -48,7 +50,6 @@ public class GripPipelineSimilar {
 		int cvResize0Interpolation = Imgproc.INTER_LINEAR;
 		// System.err.println("resize0 " + cvResize0Src);
 		cvResize(cvResize0Src, cvResize0Dsize, cvResize0Fx, cvResize0Fy, cvResize0Interpolation, cvResize0Output);
-
 		// Step Blur0:
 		Mat blurInput = cvResize0Output;
 		BlurType blurType = BlurType.get("Gaussian Blur");
@@ -92,7 +93,6 @@ public class GripPipelineSimilar {
 		double cvAdaptivethresholdC = 0.0;
 		// System.err.println("CV_adaptiveThreshold0 " + cvAdaptivethresholdSrc);
 		cvAdaptivethreshold(cvAdaptivethresholdSrc, cvAdaptivethresholdMaxvalue, cvAdaptivethresholdAdaptivemethod, cvAdaptivethresholdThresholdtype, cvAdaptivethresholdBlocksize, cvAdaptivethresholdC, cvAdaptivethresholdOutput);
-
 	}
 
 	/**
@@ -311,7 +311,4 @@ public class GripPipelineSimilar {
 		cvResize1Output.release();
 		cvAdaptivethresholdOutput.release();
 	}
-
-
 }
-
