@@ -537,7 +537,7 @@ public class App {
     rsOuter.close();
   }
 }
-// stops display of images (27 == esc)
+
 /*
 Calculating the sum of the squares of the differences of the pixel colour values of a drastically scaled-down version (eg: 6x6 pixels) works nicely. Identical images yield 0, similar images yield small numbers, different images yield big ones.
 
