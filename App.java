@@ -18,18 +18,21 @@
 // default is don't use mssim
 
 // After displaying similar image pairs, command file "imageEdit.cmd file1 file2" is run
-// Image A is presented with the similarity indices. Press Enter and Image B is presented and again
-// the similarity indices. Press enter and the imageEdit.cmd is run typically to show the two files
+// Image A is presented with the similarity indices. Press any key and Image B is presented and again
+// the similarity indices. Press any key and the imageEdit.cmd is run typically to show the two files
 // in IrfanView or other editor so the files can be renamed, deleted, or do nothing but close the editor.
 
-// Processes only case insensitive "*.jpg". Could add others such as "jpeg", "png", etc.
-// To list all the files and folders that are not "jpg", use Agent Ransack search case insensitive "NOT:*.jpg"
+// Note that pressing "Q" or "q" when an image displays quits the displaying of the similar images.
+// Processing images for similarities and logging to files continues as normal, though.
 
-// Running a duplicate file finder such as "CCleaner" is more efficient and has options to match files by
-// name, date, size, or contents and easily delete excess files (but without viewing them first).
+// Processes only case insensitive "*.jpg". Could change code to add others such as "jpeg", "png", etc.
+// To list all the files and folders that are not "jpg", use Agent Ransack search case insensitive "NOT:*.jpg"
 
 // This similarity program does not do a byte by byte file comparison and cannot know if the files are
 // truly identical. For exact compares use something like "CCleaner" or DOS/command line prompt program "comp".
+
+// Running a duplicate file finder such as "CCleaner" is more efficient and has options to match files by
+// name, date, size, or contents and easily delete excess files (but without viewing them first).
 
 /*
 Example file to run: FindDuplicateImages.bat
@@ -56,7 +59,7 @@ import org.h2.tools.DeleteDbFiles;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
-import org.opencv.highgui.HighGui;
+// import org.opencv.highgui.HighGui; // use temp repair fix until OpenCV is fixed
 import org.opencv.imgcodecs.Imgcodecs;
 
 import java.io.BufferedReader;
@@ -108,6 +111,8 @@ public class App {
   static final boolean BW = true; // compares channel 0 - Y of YUV
   static final boolean COLOR = true; // compares channels 1 and 2 - UV of YUV
   static boolean displayImages; // display similar images
+  private static final int keyQuitQ = 81;
+  private static final int keyQuitq = 113;
   // max number of "dimensions" different to consider similar
   // suggest if BW && COLOR maxDifferences = 12 else maxDifferences = 9
   static int maxDifferences = 12;
@@ -257,7 +262,7 @@ public class App {
           // System.out.println(file + " <> " + file.getAbsoluteFile() + "{}" +
           // file.getAbsolutePath());
 
-          return file.isDirectory()// process all directories and files ending with ".jpg"
+          return file.isDirectory() // process all directories and files ending with ".jpg"
               || (file.canRead() && file.getName().length() >= 4
                   && file.getName().substring(file.getName().length() - 4).equalsIgnoreCase(".JPG"));
           // || (file.canRead()) && (file.getName().endsWith(".jpg") ||
@@ -507,16 +512,18 @@ public class App {
                 // HighGui.imshow("A " + similarity + " " + rsOuter.getString("filename"),
                 // srcA);
                 int rc = HighGui.waitKey(0);
-                if (rc == 81 || rc == 113)
-                  displayImages = false; // Q or q stops display of images (27 == esc)
+                if (rc == keyQuitQ || rc == keyQuitq) {
+                  displayImages = false;                  
+                }
                 else {
                   HighGui.imshow(
                       "B " + similarity + " " + String.format("%4.2f ", mssim) + rsInner.getString("filename"), srcB);
                   // HighGui.imshow("B " + similarity + " " + rsInner.getString("filename"),
                   // srcB);
                   rc = HighGui.waitKey(0);
-                  if (rc == 81 || rc == 113)
-                    displayImages = false;
+                  if (rc == keyQuitQ || rc == keyQuitq) {
+                    displayImages = false;                    
+                  }
                 }
                 srcA.release();
                 srcB.release();
@@ -530,6 +537,7 @@ public class App {
     rsOuter.close();
   }
 }
+// stops display of images (27 == esc)
 /*
 Calculating the sum of the squares of the differences of the pixel colour values of a drastically scaled-down version (eg: 6x6 pixels) works nicely. Identical images yield 0, similar images yield small numbers, different images yield big ones.
 
