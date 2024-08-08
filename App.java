@@ -1,3 +1,13 @@
+// Find similar images
+
+// Simplifies an image using transforms such as resize, blur, equalize, normalize, and threshold
+// and uses that as a signature to compare using the Hamming distance to all other images.
+// Additional refining comparisons are optionally made using using MSSIM cross-correlation.
+
+// The 3 planes of the color space have separate signatures calculated that are combined.
+
+// Gray images are converted to color space to continue processing that way.
+
 // Example:java -cp Similar.jar app.App "path" (if libraries not necessarily included in the jar)
 // Example:java -jar Similar.jar "path" (if all libraries included in the jar)
 // no refined mssim comparison; start JPG file search at C:\\
@@ -14,8 +24,8 @@
 // start JPG file search at C:\\Users\\RKT\\Pictures
 // create signature vectors file
 
-// mssim is optional and should be a double from 0 (dissimilar) to 1 (essentially identical)
-// default is don't use mssim
+// MSSIM is optional and should be a double from 0 (dissimilar) to 1 (essentially identical)
+// default is don't use MSSIM
 
 // After displaying similar image pairs, command file "imageEdit.cmd file1 file2" is run
 // Image A is presented with the similarity indices. Press any key and Image B is presented and again
@@ -25,8 +35,9 @@
 // Note that pressing "Q" or "q" when an image displays quits the displaying of the similar images.
 // Processing images for similarities and logging to files continues as normal, though.
 
-// Processes only case insensitive "*.jpg". Could change code to add others such as "jpeg", "png", etc.
-// To list all the files and folders that are not "jpg", use Agent Ransack search case insensitive "NOT:*.jpg"
+// Processes case insensitive "*.jpg", "*.jpeg", "*.png". Others supported by OpenCV could be added.
+// To list all the files and folders that are not "jpg", for example, use Agent Ransack search case
+// insensitive "NOT:*.jpg"
 
 // This similarity program does not do a byte by byte file comparison and cannot know if the files are
 // truly identical. For exact compares use something like "CCleaner" or DOS/command line prompt program "comp".
@@ -86,13 +97,13 @@ public class App {
     // System.out.println("OpenCV version " + Core.getVersionString() + "\n" + Core.getBuildInformation());
   }
 
-  // [Kohonen vector output for post processing]
+  // [Kohonen vector output for SOM post processing]
   static boolean kohRun; // user specified switch to put out signature vectors or not for Kohonen e.g.
   // following definitions only for Kohonen
   static FileOutputStream koh; // similarity vector for Kohonen process
   static PrintStream kohVectors;
   static boolean firstTimeWriteKohNumDimensions;
-  // ! [Kohonen vector output for post processing]
+  // ! [Kohonen vector output for SOM post processing]
 
   static final App x = new App();
   static Connection conn;
@@ -118,7 +129,7 @@ public class App {
   static int maxDifferences = 12;
 
   static boolean doMSSIM;
-  // additional refinement for differences uses computer hog MSSIM
+  // additional refinement for differences uses more accurate and slow MSSIM
   // only used for possible matches from the signature comparison (maxDifferences)
   // which occasionally matches 2 very different images
   // 1. to .8 is very similar
@@ -227,8 +238,8 @@ public class App {
               + "signature1 long,signature2 long,signature3 long,"
               + "filename varchar)"); // CREATE DB
 
-    Filewalker fw = x.new Filewalker(); // SEARCH FOR JPG
-    fw.walk(imageDirectory); // SEARCH FOR JPG and compress them
+    Filewalker fw = x.new Filewalker(); // SEARCH FOR FILES and DIRECTORIES
+    fw.walk(imageDirectory); // search for and compress images
 
     statementInsert.close();
 
@@ -248,7 +259,7 @@ public class App {
 
     /**
      * Called recursively for subdirectories
-     * @param path
+     * @param path Starting path that is searched to the end of the tree
      */
     public void walk(String path) {
 
@@ -262,11 +273,25 @@ public class App {
           // System.out.println(file + " <> " + file.getAbsoluteFile() + "{}" +
           // file.getAbsolutePath());
 
-          return file.isDirectory() // process all directories and files ending with ".jpg"
-              || (file.canRead() && file.getName().length() >= 4
-                  && file.getName().substring(file.getName().length() - 4).equalsIgnoreCase(".JPG"));
-          // || (file.canRead()) && (file.getName().endsWith(".jpg") ||
-          // file.getName().endsWith(".JPG"));
+          return
+            file.isDirectory() // process all directories
+             ||
+            (file.canRead() // process selected readable image files
+              &&
+              ( // ending with: 
+                (file.getName().length() >= 4
+                  && 
+                  (file.getName().substring(file.getName().length() - 4).equalsIgnoreCase(".JPG")
+                  ||
+                  file.getName().substring(file.getName().length() - 4).equalsIgnoreCase(".PNG"))
+                )
+                ||
+                (file.getName().length() >= 5
+                  &&
+                  file.getName().substring(file.getName().length() - 5).equalsIgnoreCase(".JPEG")
+                )
+              )
+            );
         }
       };
       // ! Create a FilenameFilter
@@ -329,7 +354,7 @@ public class App {
         // [Compute Hash]
         signatureImage = new GripPipelineSimilar();
 
-        long[] hash = { 0, 0, 0 }; // space for 3 channels; might not use them all
+        long[] hash = { 0, 0, 0 }; // space for 3 channels
 
         boolean firstTimeWriteKohID = true;
 
@@ -435,6 +460,11 @@ public class App {
     return sb.toString();
   }
 
+  /**
+   * Compute the Hamming Distance between two images' signatures
+   * Optionally compute the MSSIM cross-correlation to validate similar signatures
+   * @throws Exception
+   */
   void findSimilarImages() throws Exception {
 
     ResultSet rsOuter = statementOuter.executeQuery("select * from signature");
@@ -453,10 +483,11 @@ public class App {
       while (rsInner.next()) { // inner loop over the rest - diagonal half - to find similarities
 
         // System.out.print("\r" + rsOuter.getInt("id") + ":" + rsInner.getInt("id"));
-        // Compute similarity index as (approximately) the number of different bits of the compressed
-        // signature. That is the number of 1's in the XOR difference.  Suggested current implementation is
-        // counts the similar bits in Y and a fourth the count of bits in U and V.
-        // Lower count means more similar
+
+        // Compute similarity index as the Hamming Distance as the number of different bits between the two compressed
+        // signatures. That is the number of 1's in the XOR difference.  Suggested current implementation is it
+        // counts the similar bits in Y plane and one fourth the count of bits in U and V planes.
+        // Lower count means more similar.
         int similarity;
         similarity = Long.bitCount(rsOuter.getLong("signature1") ^ rsInner.getLong("signature1"))
             + ((Long.bitCount(rsOuter.getLong("signature2") ^ rsInner.getLong("signature2"))
@@ -472,9 +503,9 @@ public class App {
 
           if (doMSSIM && filesExist) {
             // mssim technique seems to have fewer false similars than the signature/hash
-            // but at huge cost for reading entire images n^2/2 times instead of the
+            // but at huge cost for reading and processing entire images n^2/2 times instead of the
             // short signature of images which usually can be stored in memory.
-            // too much reading of images from a mechanical disk drive will destroy
+            // Too much reading of images from a mechanical disk drive will destroy
             // the drive (I know).
 
             // Get the 2 images (again)
