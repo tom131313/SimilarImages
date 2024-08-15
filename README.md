@@ -8,9 +8,9 @@ It uses H2 Java database and OpenCV Java.
 
 The algorithm is mostly from the help of "findimagedupes" (2.19) with other ideas from StackOverflow comments.
 
-Since that relatively easily computed "signature" of an image (used to compare images) is prone to some failures - some black and white photos appear to be similar to images of  text - a more accurate MSSIM algorithm is used for comparing images that the signature deems similar.  MSSIM isn't used for all comparisions because it's a computer hog.  MSSIM index is a little better than the hash code method but it is very expensive - a thousand times more cpu and elapsed time compared to the hash code.  It beats a hard drive to death - literally but it's still really slow on SSD.
+Since that relatively easily computed "signature" of an image (used to compare images) is prone to some failures - some black and white photos appear to be similar to images of  text - a more accurate MSSIM algorithm is used for comparing images that the signature deems similar.  MSSIM isn't used for all comparisions because it's a computer hog.  MSSIM index is a little better than the hash code method but it is very expensive - a thousand times more cpu and elapsed time compared to the hash code.  It beats a hard drive to death - literally but it's still really slow on SSD. Since MSSIM can have false negatives (similar images reported as much different) a SIFT-FLANN feature matching is performed as a "tie-breaker."
 
-Other comparison algorithms (SSIM, histogram and more) were tried but what's here is more than complicated enough to find highly accurately my dupes and similar images. (And there are other expensive cross-correlations such as wavelet signatures (DWT), NC (normalized cross-correlation) and more that weren't tried.)
+Other comparison algorithms (SSIM, histogram and more) were tried but what's here is more than complicated enough to find highly accurately my dupes and similar images. (And there are other expensive cross-correlations such as wavelet signatures (DWT), NC (normalized cross-correlation) and much more that weren't tried.)
 
 GRIP was used to generate most of the image processing pipeline Java code.
 
