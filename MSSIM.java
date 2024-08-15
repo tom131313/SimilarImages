@@ -24,8 +24,8 @@ public class MSSIM
 
     Mat i1 = Mat.zeros(1, 1, CvType.CV_8UC1);
     Mat i2 = Mat.zeros(1, 1, CvType.CV_8UC1);
-    Imgproc.resize(iA, i1, new Size(160, 160), 0., 0., Imgproc.INTER_LINEAR);
-    Imgproc.resize(iB, i2, new Size(160, 160), 0., 0., Imgproc.INTER_LINEAR);
+    Imgproc.resize(iA, i1, new Size(128, 128), 0., 0., Imgproc.INTER_LINEAR);
+    Imgproc.resize(iB, i2, new Size(128, 128), 0., 0., Imgproc.INTER_LINEAR);
     final Scalar C1 = new Scalar(6.5025), C2 = new Scalar(58.5225);
 
     /***************************** INITS **********************************/
@@ -67,21 +67,20 @@ public class MSSIM
 
     Mat sigma1_2=new Mat(), sigma2_2=new Mat(), sigma12=new Mat();
 
-    Imgproc.blur(I1_2, sigma1_2, new Size(9, 9));
+    Imgproc.blur(I1_2, sigma1_2, new Size(9, 9)); // box filter - good and fast
     //Imgproc.GaussianBlur(I1_2, sigma1_2, new Size(11, 11), 1.5);
     //sigma1_2 -= mu1_2;
     Core.subtract(sigma1_2, mu1_2, sigma1_2);
 
-    Imgproc.blur(I2_2, sigma2_2, new Size(9, 9));
+    Imgproc.blur(I2_2, sigma2_2, new Size(9, 9)); // box filter - good and fast
     //Imgproc.GaussianBlur(I2_2, sigma2_2, new Size(11, 11), 1.5);
     //sigma2_2 -= mu2_2;
     Core.subtract(sigma2_2, mu2_2, sigma2_2);
 
-    Imgproc.blur(I1_I2, sigma12, new Size(9, 9));
+    Imgproc.blur(I1_I2, sigma12, new Size(9, 9)); // box filter - good and fast
     I2_2.release();
     I1_2.release();
     I1_I2.release();
-
     //Imgproc.GaussianBlur(I1_I2, sigma12, new Size(11, 11), 1.5);
     //sigma12 -= mu1_mu2;
     Core.subtract(sigma12, mu1_mu2, sigma12);

@@ -1,67 +1,86 @@
-// Find similar images
-
-// Simplifies an image using transforms such as resize, blur, equalize, normalize, and threshold
-// and uses that as a signature to compare using the Hamming distance to all other images.
-// Additional refining comparisons are optionally made using using MSSIM cross-correlation.
-
-// The 3 planes of the color space have separate signatures calculated that are combined.
-
-// Gray images are converted to color space to continue processing that way.
-
-// Example:java -cp Similar.jar app.App "path" (if libraries not necessarily included in the jar)
-// Example:java -jar Similar.jar "path" (if all libraries included in the jar)
-// no refined mssim comparison; start JPG file search at C:\\
-// display similar pairs of images as they are found
-// no signature vectors output
-
-// Example:java -cp Similar.jar -Dmssim=0.25 app.APP "F:\\Pictures\\"
-// refine comparison restrict to MSSIM computation <= 0.25 (vaguely similar) (.75 is quite similar)
-// start JPG file search at f:\\Pictures\\
-// no signature vectors output
-
-// Example:java -cp Similar.jar -DnoDisplay app.App -DsignatureOut "C:\\Users\\RKT\\Pictures"
-// do not display images; do not use MSSIM similarity computation
-// start JPG file search at C:\\Users\\RKT\\Pictures
-// create signature vectors file
-
-// MSSIM is optional and should be a double from 0 (dissimilar) to 1 (essentially identical)
-// default is don't use MSSIM
-
-// After displaying similar image pairs, command file "imageEdit.cmd file1 file2" is run
-// Image A is presented with the similarity indices. Press any key and Image B is presented and again
-// the similarity indices. Press any key and the imageEdit.cmd is run typically to show the two files
-// in IrfanView or other editor so the files can be renamed, deleted, or do nothing but close the editor.
-
-// Note that pressing "Q" or "q" when an image displays quits the displaying of the similar images.
-// Processing images for similarities and logging to files continues as normal, though.
-
-// Processes case insensitive "*.jpg", "*.jpeg", "*.png". Others supported by OpenCV could be added.
-// To list all the files and folders that are not "jpg", for example, use Agent Ransack search case
-// insensitive "NOT:*.jpg"
-
-// This similarity program does not do a byte by byte file comparison and cannot know if the files are
-// truly identical. For exact compares use something like "CCleaner" or DOS/command line prompt program "comp".
-
-// Running a duplicate file finder such as "CCleaner" is more efficient and has options to match files by
-// name, date, size, or contents and easily delete excess files (but without viewing them first).
-
 /*
+Find similar images (case insensitive *.jpg, *.jpeg, *.png; recursive directory search)
+
+Simplifies an image using transforms such as resize, blur, equalize, normalize, and threshold
+and uses that as a signature to compare using the Hamming distance to all other images.
+
+There may be some false positives so additional refining comparisons are optionally made using
+MSSIM cross-correlation. There may be some false negatives with MSSIM so a "tie-breaker" is
+computed as the number of matching SIFT-FLANN features.
+
+The 3 planes of the color space have separate signatures calculated that are combined.
+
+Gray images are converted to color space to continue processing that way.
+
+Example:java -cp Similar.jar app.App "images path" (if libraries not necessarily included in the jar)
+Example:java -jar Similar.jar "images path" (if all libraries included in the jar)
+no refined mssim comparison
+display similar pairs of images as they are found
+no signature vectors output
+
+Example:java -cp Similar.jar -Dmssim=0.1 app.App "F:\\Pictures\\"
+refine comparison restrict to MSSIM computation <= 0.1 (vaguely similar) (.75 is quite similar)
+start file search at f:\\Pictures\\
+no signature vectors output
+
+Example:java -cp Similar.jar -DnoDisplay app.App -DsignatureOut "C:\\Users\\RKT\\Pictures"
+do not display images; do not use MSSIM similarity computation
+start JPG file search at C:\\Users\\RKT\\Pictures
+create signature vectors file
+
+MSSIM is optional and should be a double from 0 (dissimilar) to 1 (essentially identical)
+default is don't use MSSIM which is generally good with not many "false" similarities.
+If it is needed to reduce "false" similarities, then MSSIM=0.1 is a good minimal filter
+for grey scale images and 0.2 is a good minimal filter for color images. Larger values
+will enforce more similarities.
+
+If the simple signature indicates similarity and the MSSIM indicates dissimilarity then a
+SIFT-FLANN feature matching is performed as a "tie-breaker"
+
+After displaying similar image pairs, command file "imageEdit.cmd file1 file2" is run
+Image A is presented with the similarity indices. Press any key and Image B is presented and again
+the similarity indices. Press any key and the imageEdit.cmd is run typically to show the two files
+in IrfanView or other editor so the files can be renamed, deleted, or do nothing but close the editor.
+
+Note that pressing "Q" or "q" when an image displays quits the displaying of the similar images.
+Processing images for similarities and logging to files continues as normal, though.
+
+Processes case insensitive "*.jpg", "*.jpeg", "*.png". Others supported by OpenCV could be added.
+To list all the files and folders that are not "jpg", for example, use Agent Ransack search case
+insensitive "NOT:*.jpg"
+
+This similarity program does not do a byte by byte file comparison and cannot know if the files are
+truly identical. For exact compares use something like "CCleaner" or DOS/command line prompt program "comp".
+
+Running a duplicate file finder such as "CCleaner" is more efficient and has options to match files by
+name, date, size, or contents and easily delete excess files (but without viewing them first).
+
 Example file to run: FindDuplicateImages.bat
 
 echo on
-rem  -DsignatureOut is for Kohonen
+rem  -DsignatureOut is for Kohonen SOM input
 cd C:\Users\RKT\frc\FRC2020\Code\Similar
 rem set OPENCV_LOG_LEVEL=DEBUG
-rem java -DmaxDifferences=20 -DnoDisplay -DsignatureOut -jar Similar.jar "C:\\Users\\RKT\\Pictures\\Sony_DSC_Complete_Editing"
-rem java -Dmssim=0.75 -jar Similar.jar "F:\\Images\\Vicki"
-java -DnoDisplay -jar Similar.jar "F:\\Images"
-rem java -DnoDisplay -DsignatureOut -jar Similar.jar "C:\\Users\\RKT\\Pictures\\Sony_DSC_Complete_Editing"
-rem java -DmaxDifferences=20 -DnoDisplay -jar Similar.jar "C:\\Users\\RKT\\frc\\FRC2020\\Code\\Similar\\data"
+
+rem simple faster execution with potential for several false similarities
+java -jar Similar.jar "C:\\Users\\Public\\Pictures"
+rem OR equivalent depending on libraries included in the jar file
+rem java -cp Similar.jar app.App "C:\\Users\\Public\\Pictures"
+
+rem suggested usage to reduce false similarities
+rem java -Dmssim=0.2 -Dfeatures=10 -jar Similar.jar "C:\\Users\\Public\\Pictures"
+
+rem other examples
+rem java -DmaxDifferences=20 -DnoDisplay -DsignatureOut -jar Similar.jar "C:\\Users\\Public\\Pictures"
+rem java -Dmssim=0.75 -jar Similar.jar "C:\\Users\\Public\\Pictures"
+rem java -DnoDisplay -jar Similar.jar "C:\\Users\\Public\\Pictures"
+rem java -DnoDisplay -DsignatureOut -jar Similar.jar "C:\\Users\\Public\\Pictures"
+rem java -DmaxDifferences=20 -DnoDisplay -jar Similar.jar "C:\\Users\\Public\\Pictures"
+
 pause
 rem OPENCV_LOG_LEVEL=e or 2 
 rem  * Define CV_LOG_STRIP_LEVEL=CV_LOG_LEVEL_[DEBUG|INFO|WARN|ERROR|FATAL|DISABLED]
 rem to compile out anything at that and before that logging level
-
 */
 
 package app;
@@ -138,8 +157,11 @@ public class App {
   // below .2 is different
   static double maxDifferencesMSSIM;
 
-  //////////////////////////////////////////////////
-  //////////////////////////////////////////////////
+  // additional refinement for differencs uses slow SIFT-FLANN feature matching
+  // 0 to 5 is not similar - none or few matching features
+  // 10 - suggested minimum to discriminate similar/dissimilar
+  // > 35 - typical matching features in two very similar complex images
+  static int features = 0;
 
   // create file for the messages
   static FileOutputStream fout;
@@ -151,7 +173,8 @@ public class App {
   static ByteArrayOutputStream baos = new ByteArrayOutputStream();
   static PrintStream ps = new PrintStream(baos);
   static PrintStream realErr = System.err; // the normal err output when not doing imread
-  
+  static FeatureMatching matchFeatures = new FeatureMatching();
+
   public static void main(String[] args) throws Exception {
 
     if(args.length > 0) {
@@ -160,16 +183,18 @@ public class App {
     }
     else {
       System.out.println(
-        "java -cp Similar.jar -DsignatureOut -DnoDisplay -Dmssim=<double value> app.App \"search path\"\n"
+        "java -cp Similar.jar -DsignatureOut -DnoDisplay -Dmssim=<double value> -Dfeatures=<integer value> app.App \"search path\"\n"
          + "java -DsignatureOut -DnoDisplay -Dmssim=<double value> -jar Similar.jar \"search path\"\n"
         + "-DsignatureOut optional create vector file output\n"
         + "-DnoDisplay optional suppress display of similar image pairs\n"
         + "-DmaxDifferences optional number of differences to be considered similar\n"
         + "         [default 12, very similar; 20 is somewhat similar; 0 is essentially identical]\n"
-        + "-Dmssim=<dpuble value> optional refined similarity check [0.0 dissimilar to 1.0 essentially identical]\n"
+        + "-Dmssim=<double value> optional refined similarity check [0.0 dissimilar to 1.0 essentially identical]\n"
+        + "-Dfeatures=<integer value> minimum number of SIFT features to declare similarity if MSSIM indicates dissimilar\n"
         + "basic fast check example:java -cp  Similar.jar app.App \"C:\\Users\\Public\\Pictures\"\n"
         + "basic fast check example:java -jar Similar.jar         \"C:\\Users\\Public\\Pictures\"\n"
-        + "eliminate any gross dissimilar example:java -cp Similar.jar -Dmssim=.25 app.App \"C:\\Users\\Public\\Pictures\"\n"
+        + "eliminate many false similar images example:\"\n"
+        + " java -Dmssim=0.2 -Dfeatures=10 -jar Similar.jar \"C:\\Users\\Public\\Pictures\"\n"
         );
       return;
     }
@@ -183,10 +208,18 @@ public class App {
     }
     System.out.println("max differences to be considered similar = " + maxDifferences);
 
+    if(System.getProperty("features") != null) {
+      features = Integer.parseInt(System.getProperty("features"));
+    }
+    else {
+      features = 10;
+    }
+    System.out.println("min number of SIFT features to be considered similar if MSSIM indicates dissimilar = " + features);
+
     if(System.getProperty("mssim") != null) {
       doMSSIM = true;
       maxDifferencesMSSIM = Double.parseDouble(System.getProperty("mssim"));
-      System.out.println("MSSIM set [-Dmssim=[0. to 1.]] limit =" + maxDifferencesMSSIM);
+      System.out.println("MSSIM set [-Dmssim=[0. to 1.]] limit = " + maxDifferencesMSSIM);
     }
     else {
       doMSSIM = false;
@@ -494,8 +527,11 @@ public class App {
             + Long.bitCount(rsOuter.getLong("signature3") ^ rsInner.getLong("signature3"))) / 4);
 
         if (similarity <= maxDifferences) {
+          // little blurry images appear similar to the Hamming distance
+          // verify similarities with MSSIM and SIFT FLANN matching as necessary
  
           mssim = 0;
+          int countFeatures = 0;
           File fileA = new File(rsOuter.getString("filename"));
           File fileB = new File(rsInner.getString("filename"));
           // a file might have been deleted already and not available for further processing
@@ -512,8 +548,7 @@ public class App {
             // Run the MSSIM
             // Print the MSSIM if near 1
             // This isn't efficient - shouldn't have to get the first image more than once
-            // for the mu and std but that isn't
-            // much compared to the covariance calcs
+            // for the mu and std but that isn't much compared to the covariance calcs
 
             // need to have 2 images at once
             // tried to declare Mat srcBmssim outside the inner loop but imread has a huge
@@ -523,22 +558,30 @@ public class App {
             // getMSSIM() returns 3 values in a Scalar (val[0], val[1], val[2]).  Ostensibly it was OpenCV
             // BGR planes but MSSIM doesn't know the meaning of planes.
             // For this program the image had been converted to YUV from BGR and only the Y is checked
-            // below for MSSIM. 
+            // below for MSSIM.
+
             mssim = MSSIM.getMSSIM(srcAmssim, srcBmssim).val[0]; // roughly > 0.4 similar; < 0.4 dissimilar;
+
+            if (mssim < maxDifferencesMSSIM) {
+              // images appear dissimilar to MSSIM (and the blurred images signatures)
+              // so verify by counting the features in common
+              countFeatures = matchFeatures.SIFTFLANNMatching(srcAmssim, srcBmssim).size();   
+            }
             srcAmssim.release();
             srcBmssim.release();
           }
 
-          if (!doMSSIM || mssim >= maxDifferencesMSSIM) { // use the initial mssim for printing below if not calculating it
+          if (!doMSSIM || mssim >= maxDifferencesMSSIM || countFeatures >= features) { // use the initial mssim for printing below if not calculating it
             
             // Similar Images
-            similarFiles.format("%02d, %4.2f, %d:%d, %s || %s\n", similarity, mssim, rsOuter.getInt("id"),
-                rsInner.getInt("id"), rsOuter.getString("filename"), rsInner.getString("filename"));
+            similarFiles.format("%02d, %4.2f, %d, %d:%d, %s || %s\n",
+                similarity, mssim, countFeatures, rsOuter.getInt("id"), rsInner.getInt("id"),
+                rsOuter.getString("filename"), rsInner.getString("filename"));
 
             if (displayImages && filesExist) {
                 Mat srcA = Imgcodecs.imread(rsOuter.getString("filename"));
                 Mat srcB = Imgcodecs.imread(rsInner.getString("filename"));
-                HighGui.imshow("A " + similarity + " " + String.format("%4.2f ", mssim) + rsOuter.getString("filename"),
+                HighGui.imshow("A " + similarity + " " + String.format("%4.2f ", mssim) + countFeatures + " " + rsOuter.getString("filename"),
                     srcA);
                 // HighGui.imshow("A " + similarity + " " + rsOuter.getString("filename"),
                 // srcA);
@@ -548,7 +591,7 @@ public class App {
                 }
                 else {
                   HighGui.imshow(
-                      "B " + similarity + " " + String.format("%4.2f ", mssim) + rsInner.getString("filename"), srcB);
+                      "B " + similarity + " " + String.format("%4.2f ", mssim) + countFeatures + " " + rsInner.getString("filename"), srcB);
                   // HighGui.imshow("B " + similarity + " " + rsInner.getString("filename"),
                   // srcB);
                   rc = HighGui.waitKey(0);
